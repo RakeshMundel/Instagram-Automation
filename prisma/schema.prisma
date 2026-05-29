@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum AutomationStatus {
+  ACTIVE
+  PAUSED
+  DRAFT
+}
+
+enum TriggerType {
+  ALL_COMMENTS
+  KEYWORDS
+}
+
+enum MediaSelectionMode {
+  ALL_POSTS
+  SPECIFIC_POSTS
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  SKIPPED
+  FAILED
+  RATE_LIMITED
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+model User {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  email        String       @unique
+  name         String?
+  passwordHash String?
+  role         UserRole     @default(OWNER)
+  workspaces   Workspace[]
+  memberships  TeamMember[]
+  sessions     Session[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Workspace {
+  id                String             @id @default(auto()) @map("_id") @db.ObjectId
+  name              String
+  ownerId           String             @db.ObjectId
+  owner             User               @relation(fields: [ownerId], references: [id])
+  members           TeamMember[]
+  instagramAccounts InstagramAccount[]
+  automations       Automation[]
+  analytics         AnalyticsRollup[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([ownerId])
+}
+
+model TeamMember {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  workspaceId String    @db.ObjectId
+  userId      String    @db.ObjectId
+  role        UserRole  @default(MEMBER)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model InstagramAccount {
+  id                    String       @id @default(auto()) @map("_id") @db.ObjectId
+  workspaceId           String       @db.ObjectId
+  workspace             Workspace    @relation(fields: [workspaceId], references: [id])
+  instagramUserId       String
+  username              String
+  profilePictureUrl     String?
+  facebookPageId        String
+  facebookPageName      String?
+  encryptedAccessToken  String
+  tokenExpiresAt        DateTime?
+  permissions           String[]
+  webhookSubscribed     Boolean      @default(false)
+  automations           Automation[]
+  media                 InstagramMedia[]
+  comments              CommentEvent[]
+  dmLogs                DmLog[]
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@unique([workspaceId, instagramUserId])
+  @@index([facebookPageId])
+}
+
+model InstagramMedia {
+  id                 String           @id @default(auto()) @map("_id") @db.ObjectId
+  instagramAccountId String           @db.ObjectId
+  instagramAccount   InstagramAccount @relation(fields: [instagramAccountId], references: [id])
+  mediaId            String
+  mediaType          String
+  caption            String?
+  permalink          String?
+  thumbnailUrl       String?
+  timestamp          DateTime?
+  selectedBy         AutomationMedia[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([instagramAccountId, mediaId])
+  @@index([timestamp])
+}
+
+model Automation {
+  id                 String             @id @default(auto()) @map("_id") @db.ObjectId
+  workspaceId        String             @db.ObjectId
+  instagramAccountId String             @db.ObjectId
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id])
+  instagramAccount   InstagramAccount   @relation(fields: [instagramAccountId], references: [id])
+  name               String
+  status             AutomationStatus   @default(DRAFT)
+  triggerType        TriggerType        @default(ALL_COMMENTS)
+  mediaMode          MediaSelectionMode @default(ALL_POSTS)
+  keywords           String[]
+  blacklistKeywords  String[]
+  dmEnabled          Boolean            @default(true)
+  dmTemplates        Json
+  publicReplyEnabled Boolean            @default(true)
+  publicReplyText    String             @default("Thanks for your comment! Check your DM 👋")
+  buttonEnabled      Boolean            @default(true)
+  buttonText         String             @default("Access Now")
+  buttonUrl          String?
+  responseHours      Json?
+  dailyDmLimit       Int                @default(500)
+  cooldownMinutes    Int                @default(1440)
+  aiSpamFilter       Boolean            @default(false)
+  selectedMedia      AutomationMedia[]
+  commentEvents      CommentEvent[]
+  dmLogs             DmLog[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([instagramAccountId, status])
+  @@index([triggerType])
+}
+
+model AutomationMedia {
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  automationId String         @db.ObjectId
+  mediaId      String         @db.ObjectId
+  automation   Automation     @relation(fields: [automationId], references: [id])
+  media        InstagramMedia @relation(fields: [mediaId], references: [id])
+  createdAt    DateTime       @default(now())
+
+  @@unique([automationId, mediaId])
+  @@index([mediaId])
+}
+
+model CommentEvent {
+  id                 String           @id @default(auto()) @map("_id") @db.ObjectId
+  instagramAccountId String           @db.ObjectId
+  automationId       String?          @db.ObjectId
+  instagramAccount   InstagramAccount @relation(fields: [instagramAccountId], references: [id])
+  automation         Automation?      @relation(fields: [automationId], references: [id])
+  commentId          String
+  mediaId            String
+  fromUserId         String?
+  fromUsername       String?
+  text               String
+  matchedKeywords    String[]
+  isSpam             Boolean          @default(false)
+  publicReplyStatus  DeliveryStatus   @default(PENDING)
+  dmStatus           DeliveryStatus   @default(PENDING)
+  skipReason         String?
+  rawWebhookId       String?          @db.ObjectId
+  createdAt          DateTime         @default(now())
+  processedAt        DateTime?
+
+  @@unique([instagramAccountId, commentId])
+  @@index([automationId, createdAt])
+  @@index([instagramAccountId, mediaId, createdAt])
+  @@index([fromUserId, createdAt])
+}
+
+model DmLog {
+  id                 String           @id @default(auto()) @map("_id") @db.ObjectId
+  instagramAccountId String           @db.ObjectId
+  automationId       String?          @db.ObjectId
+  commentEventId     String?          @db.ObjectId
+  instagramAccount   InstagramAccount @relation(fields: [instagramAccountId], references: [id])
+  automation         Automation?      @relation(fields: [automationId], references: [id])
+  recipientUserId    String
+  recipientUsername  String?
+  message            String
+  buttonText         String?
+  buttonUrl          String?
+  status             DeliveryStatus   @default(PENDING)
+  metaMessageId      String?
+  errorCode          String?
+  errorMessage       String?
+  createdAt          DateTime         @default(now())
+  sentAt             DateTime?
+
+  @@index([automationId, createdAt])
+  @@index([instagramAccountId, createdAt])
+  @@index([recipientUserId, createdAt])
+  @@unique([automationId, commentEventId, recipientUserId])
+}
+
+model WebhookEvent {
+  id              String             @id @default(auto()) @map("_id") @db.ObjectId
+  source          String
+  eventId         String?
+  instagramUserId String?
+  signatureValid  Boolean
+  status          WebhookEventStatus @default(RECEIVED)
+  payload         Json
+  error           String?
+  receivedAt      DateTime           @default(now())
+  processedAt     DateTime?
+
+  @@index([instagramUserId, receivedAt])
+  @@index([status, receivedAt])
+  @@index([receivedAt])
+}
+
+model AnalyticsRollup {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  workspaceId  String    @db.ObjectId
+  automationId String?   @db.ObjectId
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+  day          DateTime
+  comments     Int       @default(0)
+  publicReplies Int      @default(0)
+  dmsSent      Int       @default(0)
+  dmsFailed    Int       @default(0)
+  keywordHits  Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([workspaceId, automationId, day])
+  @@index([day])
+}
