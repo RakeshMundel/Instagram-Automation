@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { requireUser } from "@/lib/auth";
+import { getDemoWorkspace } from "@/lib/demo-workspace";
 import { prisma } from "@/lib/prisma";
 import { paginate } from "@/lib/utils";
 
@@ -28,10 +28,10 @@ const automationSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const user = await requireUser();
+  const workspace = await getDemoWorkspace();
   const url = new URL(request.url);
   const { limit, skip, page } = paginate(url.searchParams);
-  const workspaceId = url.searchParams.get("workspaceId") ?? user.workspaces[0]?.id;
+  const workspaceId = url.searchParams.get("workspaceId") ?? workspace.id;
   if (!workspaceId) return NextResponse.json({ data: [], page, limit, total: 0 });
 
   const where = { workspaceId };
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  await requireUser();
+  await getDemoWorkspace();
   const body = automationSchema.parse(await request.json());
 
   const automation = await prisma.automation.create({

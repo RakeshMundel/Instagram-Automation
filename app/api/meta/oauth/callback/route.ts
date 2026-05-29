@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
 import { encryptSecret } from "@/lib/crypto";
 import { exchangeCodeForToken, extendLongLivedToken, fetchManagedPages } from "@/lib/meta";
 import { prisma } from "@/lib/prisma";
+import { getDemoWorkspace } from "@/lib/demo-workspace";
 
 export async function GET(request: Request) {
-  const user = await requireUser();
-  const workspaceId = user.workspaces[0]?.id;
-  if (!workspaceId) return NextResponse.json({ error: "No workspace found" }, { status: 400 });
+  const workspace = await getDemoWorkspace();
+  const workspaceId = workspace.id;
 
   const url = new URL(request.url);
   const code = url.searchParams.get("code");

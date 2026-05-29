@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { requireUser } from "@/lib/auth";
+import { getDemoWorkspace } from "@/lib/demo-workspace";
 import { prisma } from "@/lib/prisma";
 
 const updateSchema = z.object({
@@ -24,7 +24,7 @@ const updateSchema = z.object({
 });
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireUser();
+  await getDemoWorkspace();
   const { id } = await params;
   const automation = await prisma.automation.findUnique({
     where: { id },
@@ -35,7 +35,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireUser();
+  await getDemoWorkspace();
   const { id } = await params;
   const body = updateSchema.parse(await request.json());
   const automation = await prisma.automation.update({
@@ -49,7 +49,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireUser();
+  await getDemoWorkspace();
   const { id } = await params;
   await prisma.automation.delete({ where: { id } });
   return NextResponse.json({ ok: true });

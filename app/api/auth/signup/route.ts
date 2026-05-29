@@ -21,9 +21,13 @@ export async function POST(request: Request) {
       email: body.email.toLowerCase(),
       name: body.name,
       passwordHash: await hashPassword(body.password),
-      workspaces: {
-        create: { name: `${body.name ?? body.email.split("@")[0]}'s Workspace` },
-      },
+    },
+  });
+
+  await prisma.workspace.create({
+    data: {
+      name: `${body.name ?? body.email.split("@")[0]}'s Workspace`,
+      ownerId: user.id,
     },
   });
 

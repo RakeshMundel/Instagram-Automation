@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getDemoWorkspace } from "@/lib/demo-workspace";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
-  const user = await requireUser();
+  const workspace = await getDemoWorkspace();
   const url = new URL(request.url);
-  const workspaceId = url.searchParams.get("workspaceId") ?? user.workspaces[0]?.id;
+  const workspaceId = url.searchParams.get("workspaceId") ?? workspace.id;
   if (!workspaceId) return NextResponse.json({ comments: 0, dmsSent: 0, activeAutomations: 0, recent: [] });
 
   const accounts = await prisma.instagramAccount.findMany({ where: { workspaceId }, select: { id: true } });
