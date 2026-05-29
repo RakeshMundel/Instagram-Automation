@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAppUrl } from "@/lib/app-url";
 
 const scopes = [
   "instagram_basic",
@@ -12,7 +13,7 @@ const scopes = [
 ];
 
 export async function GET() {
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/meta/oauth/callback`;
+  const redirectUri = `${getAppUrl()}/api/meta/oauth/callback`;
   const url = new URL("https://www.facebook.com/dialog/oauth");
   url.searchParams.set("client_id", process.env.META_APP_ID ?? "");
   url.searchParams.set("redirect_uri", redirectUri);

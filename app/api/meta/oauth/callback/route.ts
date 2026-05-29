@@ -3,6 +3,7 @@ import { encryptSecret } from "@/lib/crypto";
 import { exchangeCodeForToken, extendLongLivedToken, fetchManagedPages } from "@/lib/meta";
 import { prisma } from "@/lib/prisma";
 import { getDemoWorkspace } from "@/lib/demo-workspace";
+import { getAppUrl } from "@/lib/app-url";
 
 export async function GET(request: Request) {
   const workspace = await getDemoWorkspace();
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   if (!code) return NextResponse.json({ error: "Missing code" }, { status: 400 });
 
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/meta/oauth/callback`;
+  const redirectUri = `${getAppUrl()}/api/meta/oauth/callback`;
   const shortToken = await exchangeCodeForToken(code, redirectUri);
   const longToken = await extendLongLivedToken(shortToken.access_token);
   const pages = await fetchManagedPages(longToken.access_token);
@@ -68,5 +69,5 @@ export async function GET(request: Request) {
     connected.push(account);
   }
 
-  return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/?connected=${connected.length}`);
+  return NextResponse.redirect(`${getAppUrl()}/?connected=${connected.length}`);
 }
