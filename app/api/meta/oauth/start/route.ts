@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 
 const scopes = [
   "instagram_basic",
@@ -13,7 +13,13 @@ const scopes = [
 ];
 
 export async function GET() {
-  await requireUser();
+  const user = await getCurrentUser();
+  if (!user) {
+    const loginUrl = new URL("/login", process.env.NEXT_PUBLIC_APP_URL);
+    loginUrl.searchParams.set("next", "/api/meta/oauth/start");
+    return NextResponse.redirect(loginUrl);
+  }
+
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/meta/oauth/callback`;
   const url = new URL("https://www.facebook.com/dialog/oauth");
   url.searchParams.set("client_id", process.env.META_APP_ID ?? "");
